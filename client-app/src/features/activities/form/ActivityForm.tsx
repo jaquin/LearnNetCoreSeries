@@ -1,13 +1,18 @@
 import { observer } from 'mobx-react-lite';
-import React, { ChangeEvent, useState } from 'react';
+import React, { ChangeEvent, useEffect, useState } from 'react';
+import { NavLink, useHistory, useParams } from 'react-router-dom';
 import { Button, Form, Segment } from 'semantic-ui-react';
+import LoadingComponent from '../../../app/layout/LoadingComponent';
 import { useStore } from '../../../app/stores/store';
- 
-export default observer(function ActivityForm() {
-    const {activityStore} = useStore();
-    const {selectedActivity,closeForm,createActivity,updateActivity,loading } = activityStore;
+import { v4 as uuid } from "uuid";
 
-    const initialState = selectedActivity ?? {
+export default observer(function ActivityForm() {
+    const history = useHistory();
+    const { activityStore } = useStore();
+    const { createActivity, updateActivity, loadActivity, loading, loadingInitial } = activityStore;
+    const { id } = useParams<{ id: string }>();
+
+    const initialState = {
         id: '',
         title: '',
         category: '',
@@ -17,18 +22,39 @@ export default observer(function ActivityForm() {
         venue: ''
     }
 
-    const [activity,setActivity] = useState(initialState);
+    const [activity, setActivity] = useState(initialState);
 
-    function handleSubmit()
-    {
-        activity.id ? updateActivity(activity) : createActivity(activity);
+
+    useEffect(() => {
+        if (id) loadActivity(id).then(activity => setActivity(activity!));
+    }, [id, loadActivity]);
+
+    if (loadingInitial || !activity) return <LoadingComponent />;
+
+
+
+    function handleSubmit() {
+        if (activity.id.length === 0) {
+            let newActivity = {
+                ...activity,
+                id: uuid()
+            };
+
+            createActivity(activity).then(() => {
+                history.push(`/activities/${newActivity.id}`)
+            });
+        }
+        else {
+            updateActivity(activity).then(() => {
+                history.push(`/activities/${activity.id}`)
+            });
+        }
     }
 
 
-    function handleInputChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>)
-    {
-        const {name,value} = event.target;
-        setActivity({...activity,[name]:value})
+    function handleInputChange(event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
+        const { name, value } = event.target;
+        setActivity({ ...activity, [name]: value })
     }
 
 
@@ -42,7 +68,7 @@ export default observer(function ActivityForm() {
                 <Form.Input placeholder="City" value={activity.city} name='city' onChange={handleInputChange} />
                 <Form.Input placeholder="Venue" value={activity.venue} name='venue' onChange={handleInputChange} />
                 <Button loading={loading} floated='right' positive type='submit' content='Submit' />
-                <Button onClick={closeForm} floated='right' negative type='button' content='Cancel' />
+                <Button as={NavLink} to={`/activities/${activity.id}`} floated='right' negative type='button' content='Cancel' />
             </Form>
         </Segment>
     );
